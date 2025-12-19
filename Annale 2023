@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PASS UE2 - Annale 2022-2023 (App Interactive)</title>
+    <style>
+        /* --- THEME SOMBRE PAR DÉFAUT (ULTRA DARK) --- */
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #60a5fa;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            
+            /* Couleurs fixes pour le mode sombre */
+            --background: #000000;       /* Noir Pur */
+            --card-bg: #121212;          /* Gris Anthracite */
+            --item-bg: #1a1a1a;          /* Gris sombre */
+            --text-main: #ffffff;        /* Blanc Pur */
+            --text-muted: #a3a3a3;       /* Gris clair */
+            --border: #333333;           /* Bordure subtile */
+            --shadow: 0 4px 20px rgba(255,255,255,0.05);
+        }
+
+        [data-theme="light"] {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --item-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        * { box-sizing: border-box; transition: background-color 0.3s, color 0.2s; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--background); color: var(--text-main); height: 100vh; overflow: hidden; }
+
+        /* --- LAYOUT --- */
+        #app { display: flex; flex-direction: column; height: 100%; }
+        
+        header { padding: 1rem 2rem; background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .header-title h1 { margin: 0; font-size: 1.2rem; }
+        .header-controls { display: flex; gap: 1rem; align-items: center; }
+        .timer { font-family: monospace; font-size: 1.2rem; font-weight: bold; padding: 0.25rem 0.75rem; background: var(--background); border-radius: 6px; border: 1px solid var(--border); color: var(--text-main); }
+        .timer.paused { opacity: 0.5; }
+
+        main { flex: 1; position: relative; overflow: hidden; display: flex; }
+        
+        #nav-panel {
+            position: absolute; left: -320px; top: 0; bottom: 0; width: 300px;
+            background: var(--card-bg); border-right: 1px solid var(--border);
+            z-index: 20; transition: transform 0.3s ease; display: flex; flex-direction: column;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.5);
+        }
+        #nav-panel.open { transform: translateX(320px); }
+        .nav-grid { padding: 1rem; overflow-y: auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+        .nav-btn { aspect-ratio: 1; border: 1px solid var(--border); background: var(--item-bg); border-radius: 4px; cursor: pointer; font-size: 0.9rem; color: var(--text-main); }
+        .nav-btn.success { background: var(--success); color: white; border-color: var(--success); }
+        .nav-btn.warning { background: var(--warning); color: white; border-color: var(--warning); }
+        .nav-btn.danger { background: var(--danger); color: white; border-color: var(--danger); }
+        .nav-btn.current { border: 2px solid var(--primary); }
+
+        #question-container { flex: 1; overflow-y: auto; padding: 2rem; max-width: 900px; margin: 0 auto; width: 100%; }
+        .question-card { background: var(--card-bg); padding: 2rem; border-radius: 12px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+        .q-header { display: flex; justify-content: space-between; margin-bottom: 1.5rem; color: var(--text-muted); font-weight: 600; }
+        .q-text { font-size: 1.25rem; margin-bottom: 2rem; line-height: 1.5; color: var(--text-main); }
+        
+        .item-row { display: flex; align-items: flex-start; padding: 1rem; margin-bottom: 0.75rem; border: 1px solid var(--border); background: var(--item-bg); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .item-row:hover { border-color: var(--primary); transform: translateX(5px); }
+        .item-row.selected { border-color: var(--primary); background: rgba(59, 130, 246, 0.15); }
+        .checkbox { width: 24px; height: 24px; border: 2px solid var(--text-muted); border-radius: 4px; margin-right: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--text-main); }
+        .item-row.selected .checkbox { background: var(--primary); border-color: var(--primary); color: white; }
+        .item-letter { font-weight: bold; margin-right: 0.5rem; color: var(--primary); }
+
+        footer { padding: 1rem 2rem; background: var(--card-bg); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; }
+        button { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 1rem; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+        .btn-outline:hover { border-color: var(--text-main); color: var(--text-main); }
+
+        /* FEEDBACK OVERLAY */
+        #feedback-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95);
+            z-index: 50; display: none; flex-direction: column; backdrop-filter: blur(5px);
+        }
+        #feedback-overlay.active { display: flex; }
+        .feedback-summary { height: 30%; background: var(--card-bg); padding: 2rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-bottom: 1px solid var(--border); text-align: center; }
+        .feedback-details { height: 70%; background: var(--background); overflow-y: auto; padding: 2rem; }
+        .detail-card { max-width: 800px; margin: 0 auto 1rem; background: var(--card-bg); padding: 1.5rem; border-radius: 8px; border-left: 5px solid transparent; box-shadow: var(--shadow); border: 1px solid var(--border); color: var(--text-main); }
+        .detail-card.correct { border-left-color: var(--success); }
+        .detail-card.error { border-left-color: var(--danger); }
+
+        /* --- SUMMARY SCREEN STYLES --- */
+        #summary-screen { 
+            display: none; 
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            padding: 2rem; overflow-y: auto; 
+            background: var(--background); 
+            color: var(--text-main);
+            z-index: 100;
+        }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--card-bg); padding: 1.5rem; border-radius: 8px; text-align: center; box-shadow: var(--shadow); border: 1px solid var(--border); color: var(--text-main); }
+        .stat-val { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        
+        /* Summary Question Block */
+        .summary-block {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+        .summary-block h3 { margin-top: 0; display: flex; justify-content: space-between; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+        .summary-block .score-tag { font-size: 0.9em; padding: 2px 8px; border-radius: 4px; color: white; }
+        
+        .summary-item-row {
+            display: flex;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: flex-start;
+        }
+        .summary-item-status { width: 25px; font-size: 1.2rem; flex-shrink: 0; }
+        .summary-item-text { flex: 1; color: var(--text-main); }
+        .summary-item-expl { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem; font-style: italic; }
+        .user-action { font-size: 0.8rem; text-transform: uppercase; font-weight: bold; margin-left: 0.5rem; padding: 2px 4px; border-radius: 3px; }
+        .ua-checked { background: rgba(59, 130, 246, 0.2); color: var(--primary-dark); }
+        
+        .buttons-row { display: flex; gap: 1rem; justify-content: center; margin-top: 2rem; margin-bottom: 4rem; }
+
+        /* Utils */
+        .hidden { display: none !important; }
+        #home-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 2rem; background: var(--background); color: var(--text-main); }
+        .hero-title { font-size: 2.5rem; margin-bottom: 1rem; color: var(--primary); }
+    </style>
+</head>
+<body data-theme="dark">
+
+<div id="app">
+    <div id="home-screen">
+        <h1 class="hero-title">PASS UE2 - Annale 2022-2023</h1>
+        <p style="font-size: 1.2rem; color: var(--text-muted); margin-bottom: 2rem;">Biostatistiques & Épidémiologie<br>20 Questions QCM • Notation Stricte</p>
+        <div style="background: var(--card-bg); padding: 2rem; border-radius: 12px; box-shadow: var(--shadow); max-width: 500px; border: 1px solid var(--border);">
+            <p><strong>Règles de notation :</strong></p>
+            <ul style="text-align: left; margin-bottom: 2rem; color: var(--text-main);">
+                <li>✅ 0 erreur = <strong>1 Point</strong></li>
+                <li>⚠️ 1 erreur = <strong>0.5 Point</strong></li>
+                <li>❌ 2+ erreurs = <strong>0 Point</strong></li>
+            </ul>
+            <button class="btn-primary" onclick="startQuiz()" style="width: 100%; font-size: 1.2rem;">Commencer l'entraînement</button>
+        </div>
+    </div>
+
+    <div id="quiz-interface" class="hidden" style="height: 100%; display: flex; flex-direction: column;">
+        <header>
+            <div class="header-controls">
+                <button class="btn-outline" onclick="toggleNav()" style="padding: 0.5rem;">☰ Questions</button>
+                <div class="header-title">
+                    <h1 id="header-q-num" style="color: var(--text-main);">Question 1/20</h1>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div id="timer" class="timer">00:00</div>
+                <button class="btn-outline" onclick="toggleTheme()" style="padding: 0.5rem;">☀️/🌑</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="nav-panel">
+                <div style="padding: 1rem; border-bottom: 1px solid var(--border); color: var(--text-main);">
+                    <strong>Navigation</strong>
+                </div>
+                <div class="nav-grid" id="nav-grid"></div>
+            </div>
+
+            <div id="question-container"></div>
+        </main>
+
+        <footer>
+            <button class="btn-outline" onclick="flagQuestion()">⭐ Flaguer</button>
+            <button class="btn-primary" onclick="validateAnswer()">Valider la réponse</button>
+        </footer>
+    </div>
+
+    <div id="feedback-overlay">
+        <div class="feedback-summary" id="feedback-summary"></div>
+        <div class="feedback-details" id="feedback-details"></div>
+        <div id="feedback-action-area" style="background: var(--card-bg); padding: 1.5rem; border-top: 1px solid var(--border); text-align: center;"></div>
+    </div>
+
+    <div id="summary-screen">
+        <div style="max-width: 900px; margin: 0 auto;">
+            <h1 style="text-align: center; margin-bottom: 2rem; color: var(--text-main);">Résultats Détaillés</h1>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-val" id="final-score">--/20</div>
+                    <div style="color: var(--text-muted);">Note Finale</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" id="final-percent">--%</div>
+                    <div style="color: var(--text-muted);">Réussite</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" id="final-time">--:--</div>
+                    <div style="color: var(--text-muted);">Temps Total</div>
+                </div>
+            </div>
+
+            <div id="summary-details">
+                </div>
+            
+            <div class="buttons-row">
+                <button class="btn-outline" onclick="copyCorrection()" style="border-color: var(--primary); color: var(--primary);">📋 Copier le rapport complet</button>
+                <button class="btn-primary" onclick="location.reload()">🔄 Recommencer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- DATA IMPORT FROM PDF UE2 2022-2023 ---
+const quizData = {
+    title: "UE2 Annale 2022-2023",
+    questions: [
+        {
+            id: 1,
+            text: "Concernant la fréquentation des cinémas, les réponses jamais, rarement, parfois, souvent, toujours représentent :",
+            items: [
+                { id: "A", text: "Contiennent plus d'information qu'une variable dichotomique Oui/Non", correct: true, explication: "Vrai. Une variable à 5 niveaux contient plus d'information qu'une variable à 2 niveaux." },
+                { id: "B", text: "Une variable ordinale", correct: true, explication: "Vrai. Il existe un ordre logique (fréquence croissante)." },
+                { id: "C", text: "Une variable quantitative discrète", correct: false, explication: "Faux. C'est une variable qualitative ordinale." },
+                { id: "D", text: "Une variable nominale", correct: false, explication: "Faux. Nominale = pas d'ordre." },
+                { id: "E", text: "Sont une catégorisation parfois plus intelligible qu'une variable continue", correct: true, explication: "Vrai. Permet de faire des groupes cliniques pertinents." }
+            ]
+        },
+        {
+            id: 2,
+            text: "Les statistiques descriptives d'une variable quantitative comportent :",
+            items: [
+                { id: "A", text: "l'intervalle de Pari", correct: false, explication: "Faux. Intervalle de pari concerne les fluctuations d'échantillonnage." },
+                { id: "B", text: "une mesure de position seulement", correct: false, explication: "Faux. Il faut aussi la dispersion." },
+                { id: "C", text: "l'effectif seulement", correct: false, explication: "Faux." },
+                { id: "D", text: "l'hypothèse nulle", correct: false, explication: "Faux." },
+                { id: "E", text: "aucune des réponses ci-dessus", correct: true, explication: "Vrai. Il faut Effectif + Position + Dispersion." }
+            ]
+        },
+        {
+            id: 3,
+            text: "La description d'une variable dichotomique comporte :",
+            items: [
+                { id: "A", text: "une mesure de position et une mesure de dispersion", correct: false, explication: "Faux. C'est pour les quantitatives." },
+                { id: "B", text: "le risque alpha", correct: false, explication: "Faux." },
+                { id: "C", text: "la probabilité p de rejeter à tort l'hypothèse nulle", correct: false, explication: "Faux." },
+                { id: "D", text: "l'effectif et le pourcentage", correct: true, explication: "Vrai. Variable qualitative binaire (dichotomique)." },
+                { id: "E", text: "le coefficient de corrélation", correct: false, explication: "Faux." }
+            ]
+        },
+        {
+            id: 4,
+            text: "Parmi les mesures suivantes sont des mesures de position:",
+            items: [
+                { id: "A", text: "la médiane", correct: true, explication: "Vrai. Position centrale." },
+                { id: "B", text: "le premier percentile", correct: true, explication: "Vrai. Position." },
+                { id: "C", text: "la moyenne", correct: true, explication: "Vrai. Position centrale." },
+                { id: "D", text: "le 3 eme quartile", correct: true, explication: "Vrai. Position." },
+                { id: "E", text: "le 2ème décile", correct: true, explication: "Vrai. Position." }
+            ]
+        },
+        {
+            id: 5,
+            text: "Parmi les mesures suivantes sont des mesures de dispersion:",
+            items: [
+                { id: "A", text: "l'intervalle entre deuxième et huitième décile", correct: false, explication: "Faux (selon correction). Considéré comme un intervalle inter-décile non standard ou ambigu. L'écart interquartile (C) est la mesure standard." },
+                { id: "B", text: "l'écart type", correct: true, explication: "Vrai. Dispersion autour de la moyenne." },
+                { id: "C", text: "l'intervalle interquartile", correct: true, explication: "Vrai. Dispersion autour de la médiane." },
+                { id: "D", text: "l'étendue", correct: true, explication: "Vrai. Max - Min." },
+                { id: "E", text: "la variance", correct: true, explication: "Vrai. Carré de l'écart-type." }
+            ]
+        },
+        {
+            id: 6,
+            text: "Les méthodes d'échantillonnage non probabiliste comportent :",
+            items: [
+                { id: "A", text: "la méthode des quotas", correct: true, explication: "Vrai. Méthode empirique." },
+                { id: "B", text: "le sondage stratifié", correct: false, explication: "Faux. Probabiliste." },
+                { id: "C", text: "la méthode de la boule de neige", correct: true, explication: "Vrai. De proche en proche." },
+                { id: "D", text: "le sondage multiétapes", correct: false, explication: "Faux. Probabiliste." },
+                { id: "E", text: "la méthode des unités types", correct: true, explication: "Vrai. Choix raisonné." }
+            ]
+        },
+        {
+            id: 7,
+            text: "La moyenne d'âge... est de 65 ans avec un intervalle de confiance à 95% de 45 à 85 ans. Cela signifie que :",
+            items: [
+                { id: "A", text: "il est possible de quantifier le risque de se tromper", correct: true, explication: "Vrai. Le risque est de 5%." },
+                { id: "B", text: "on est certain que la vraie valeur se trouve entre 45 et 85 ans", correct: false, explication: "Faux. On n'est jamais certain." },
+                { id: "C", text: "il y a 95% de chances que la vraie valeur se trouve entre 45 et 85 ans", correct: true, explication: "Vrai." },
+                { id: "D", text: "il y a 5% de chances que la vraie valeur se trouve en dessous de 45 ans ou au dessus de 85ans", correct: true, explication: "Vrai. C'est le risque alpha." },
+                { id: "E", text: "il y a 5% de chances que la vraie valeur se trouve entre 45 et 85 ans", correct: false, explication: "Faux." }
+            ]
+        },
+        {
+            id: 8,
+            text: "La taille moyenne... est de 175 cm avec un IC à 95% de 170 à 180 cm. Si l'on reprend un autre échantillon aléatoire plus petit :",
+            items: [
+                { id: "A", text: "la précision de l'estimation de la moyenne d'âge sera meilleure", correct: false, explication: "Faux. Echantillon plus petit = Moins de précision." },
+                { id: "B", text: "l'intervalle de confiance à 95% sera plus étroit", correct: false, explication: "Faux. Il sera plus large." },
+                { id: "C", text: "l'intervalle de confiance à 95% sera le même", correct: false, explication: "Faux." },
+                { id: "D", text: "l'intervalle de confiance à 95% sera plus étendu", correct: true, explication: "Vrai. Moins d'info = Plus d'incertitude." },
+                { id: "E", text: "la précision de l'estimation de la taille moyenne sera identique", correct: false, explication: "Faux." }
+            ]
+        },
+        {
+            id: 9,
+            text: "L'ARS cherche à avoir des chiffres... Ce registre est exhaustif... La prévalence est de 1 pour mille.",
+            items: [
+                { id: "A", text: "la précision de l'estimation sera mauvaise", correct: false, explication: "Faux." },
+                { id: "B", text: "l'intervalle de confiance à 95% sera étroit", correct: false, explication: "Faux." },
+                { id: "C", text: "l'intervalle de confiance à 95% sera large", correct: false, explication: "Faux." },
+                { id: "D", text: "il s'agit de statistiques inductives", correct: false, explication: "Faux. Statistiques descriptives." },
+                { id: "E", text: "les données étant exhaustives, ce n'est pas un échantillon et il n'y a pas lieu de donner un intervalle de confiance", correct: true, explication: "Vrai. Recensement = Valeur exacte." }
+            ]
+        },
+        {
+            id: 10,
+            text: "Concernant les tests d'hypothèse:",
+            items: [
+                { id: "A", text: "l'hypothèse nulle et l'hypothèse alternative peuvent être vraies en même temps", correct: false, explication: "Faux. Elles sont exclusives." },
+                { id: "B", text: "Quelque soit le type de variable... le raisonnement est le même", correct: true, explication: "Vrai. Le principe du test statistique est universel." },
+                { id: "C", text: "l'hypothèse alternative représente la situation ou les deux groupes comparés sont identiques", correct: false, explication: "Faux. H1 = Différents." },
+                { id: "D", text: "sont basés sur un raisonnement par l'absurde", correct: true, explication: "Vrai." },
+                { id: "E", text: "l'hypothèse nulle représente la situation ou les deux groupes comparés sont identiques", correct: true, explication: "Vrai." }
+            ]
+        },
+        {
+            id: 11,
+            text: "Lors d'un test d'hypothèse, au risque alpha = 5% une probabilité p = 0.038 signifie:",
+            items: [
+                { id: "A", text: "qu'il n'y a pas de différence significative entre deux groupes comparés", correct: false, explication: "Faux. p < 0.05 donc significatif." },
+                { id: "B", text: "qu'il existe une différence significative entre les deux groupes comparés", correct: true, explication: "Vrai. On rejette H0." },
+                { id: "C", text: "que l'on a 3.8 chances sur 100 de se tromper en disant que les groupes sont différents", correct: true, explication: "Vrai. p-value = probabilité de l'observation sous H0." },
+                { id: "D", text: "que l'on peut rejeter l'hypothèse nulle", correct: true, explication: "Vrai." },
+                { id: "E", text: "que l'on peut choisir l'hypothèse alternative avec 3.8% de risque d'erreur", correct: true, explication: "Vrai." }
+            ]
+        },
+        {
+            id: 12,
+            text: "Concernant les tests d'hypothèse, le risque a (alpha) :",
+            items: [
+                { id: "A", text: "correspond au risque de conclure qu'il y a une différence... alors qu'en réalité il n'y en a pas", correct: true, explication: "Vrai. Risque de 1ère espèce (Faux positif)." },
+                { id: "B", text: "correspond au risque de conclure qu'il n'y a pas de différence... alors qu'en réalité il y en a une", correct: false, explication: "Faux. C'est le risque Bêta." },
+                { id: "C", text: "marque la puissance", correct: false, explication: "Faux. Puissance = 1 - Bêta." },
+                { id: "D", text: "correspond au risque d'accepter à tort l'hypothèse nulle", correct: false, explication: "Faux. C'est le risque Bêta." },
+                { id: "E", text: "correspond au risque d'accepter à tort l'hypothèse alternative", correct: true, explication: "Vrai. Accepter H1 à tort = Rejeter H0 à tort." }
+            ]
+        },
+        {
+            id: 13,
+            text: "On cherche à savoir si la proportion de consommateurs... est plus élevée... (2 variables qualitatives) :",
+            items: [
+                { id: "A", text: "on teste l'hypothèse nulle « il n'y a aucune différence de pourcentage entre les 2 groupes »", correct: true, explication: "Vrai." },
+                { id: "B", text: "on utilise un test du Chi2", correct: true, explication: "Vrai. Comparaison de proportions." },
+                { id: "C", text: "on utilise un test de Mann Whitney", correct: false, explication: "Faux. Pour quantitatives." },
+                { id: "D", text: "si le p est au risque alpha on rejette l'hypothèse nulle", correct: false, explication: "Faux. Si p < alpha." },
+                { id: "E", text: "si le Khi2 calculé est > au Khi2(alpha) on rejette l'hypothèse nulle", correct: true, explication: "Vrai." }
+            ]
+        },
+        {
+            id: 14,
+            text: "Pour faire une comparaison statistique de 2 moyennes :",
+            items: [
+                { id: "A", text: "on teste l'hypothèse nulle « il n'y a pas de différence de moyenne entre les 2 groupes »", correct: true, explication: "Vrai." },
+                { id: "B", text: "on peut utiliser un test du x2", correct: false, explication: "Faux." },
+                { id: "C", text: "on peut utiliser un test de Mann Whitney", correct: true, explication: "Vrai (si non paramétrique)." },
+                { id: "D", text: "on peut utiliser un test de Student", correct: true, explication: "Vrai (si paramétrique)." },
+                { id: "E", text: "on définit le seuil de significativité à postériori", correct: false, explication: "Faux. A priori." }
+            ]
+        },
+        {
+            id: 15,
+            text: "La randomisation permet de :",
+            items: [
+                { id: "A", text: "D'aveugler l'investigateur et le patient", correct: false, explication: "Faux. C'est le double aveugle." },
+                { id: "B", text: "Contrôler les biais d'information", correct: false, explication: "Faux." },
+                { id: "C", text: "D'avoir plus de puissance", correct: false, explication: "Faux." },
+                { id: "D", text: "D'équilibrer les facteurs de confusion", correct: true, explication: "Vrai. Répartition homogène des groupes." },
+                { id: "E", text: "D'éviter les perdus de vue", correct: false, explication: "Faux." }
+            ]
+        },
+        {
+            id: 16,
+            text: "Cocaïne et caries, p=0,09 au Chi2 :",
+            items: [
+                { id: "A", text: "Il existe 9% de risque de se tromper si on rejette l'hypothèse nulle", correct: true, explication: "Vrai. p-value." },
+                { id: "B", text: "L'hypothèse nulle ici: la proportion... n'est pas la même...", correct: false, explication: "Faux. L'hypothèse nulle est l'égalité (est la même)." },
+                { id: "C", text: "On peut se demander... si on ne peut pas rejeter l'hypothèse nulle par manque de puissance", correct: true, explication: "Vrai. p proche de 0.05." },
+                { id: "D", text: "Avant de conclure, il est nécessaire d'étudier les biais potentiels", correct: true, explication: "Vrai." },
+                { id: "E", text: "La différence n'est pas significative pour un seuil alpha fixé à priori à 10%", correct: false, explication: "Faux. 0.09 < 0.10, donc c'est significatif à 10%." }
+            ]
+        },
+        {
+            id: 17,
+            text: "Les tests non paramétriques :",
+            items: [
+                { id: "A", text: "comportent le test de Student", correct: false, explication: "Faux." },
+                { id: "B", text: "comportent le test de Wilcoxon", correct: true, explication: "Vrai." },
+                { id: "C", text: "comportent le test de Mann Whitney", correct: true, explication: "Vrai." },
+                { id: "D", text: "sont utilisés lorsque les échantillons sont petits ou lorsque la distribution n'est pas normale", correct: true, explication: "Vrai." },
+                { id: "E", text: "sont moins sensibles aux valeurs extrèmes que les tests parametriques", correct: true, explication: "Vrai. Car basés sur les rangs." }
+            ]
+        },
+        {
+            id: 18,
+            text: "Vitamine D hommes/femmes, P=0,95 :",
+            items: [
+                { id: "A", text: "la différence entre hommes et femmes est très significative", correct: false, explication: "Faux. Pas significative (p > 0.05)." },
+                { id: "B", text: "si l'on rejette l'hypothèse nulle il y a un risque de se tromper de 95%", correct: true, explication: "Vrai." },
+                { id: "C", text: "on ne peut rejeter l'hypothèse nulle", correct: true, explication: "Vrai." },
+                { id: "D", text: "on rejette l'hypothèse nulle avec un risque de se tromper à 5%", correct: false, explication: "Faux." },
+                { id: "E", text: "si l'on accepte l'hypothèse alternative il y a un risque de 95% de se tromper", correct: true, explication: "Vrai. Accepter H1 = Rejeter H0." }
+            ]
+        },
+        {
+            id: 19,
+            text: "Les études de cohorte :",
+            items: [
+                { id: "A", text: "sont particulièrement intéressantes pour l'étude des expositions rares", correct: true, explication: "Vrai." },
+                { id: "B", text: "sont d'un niveau de preuve inférieur aux essais randomisés contrôlés", correct: false, explication: "Faux (selon correction, car manque de précision sur la puissance)." },
+                { id: "C", text: "Un de leurs avantages est qu'elles permettent de mesurer directement la prévalence", correct: false, explication: "Faux. Incidence." },
+                { id: "D", text: "sont généralement plus fiables que les études cas témoin", correct: true, explication: "Vrai." },
+                { id: "E", text: "permettent d'étudier plusieurs maladies liées à une exposition donnée", correct: true, explication: "Vrai." }
+            ]
+        },
+        {
+            id: 20,
+            text: "Les études cas témoin :",
+            items: [
+                { id: "A", text: "Un niveau de preuve supérieur aux études transversales", correct: true, explication: "Vrai." },
+                { id: "B", text: "Permettent de mesurer l'incidence de la maladie", correct: false, explication: "Faux." },
+                { id: "C", text: "Sont rétrospectives", correct: true, explication: "Vrai." },
+                { id: "D", text: "Permettent d'étudier plusieurs maladies et une exposition", correct: false, explication: "Faux. 1 Maladie, X Expos." },
+                { id: "E", text: "permettent de calculer une estimation indirecte du risque relatif", correct: true, explication: "Vrai (OR)." }
+            ]
+        }
+    ]
+};
+
+// --- STATE MANAGEMENT ---
+let currentQIndex = 0;
+let userAnswers = {}; // { qId: ['A', 'C'] }
+let flaggedQuestions = new Set();
+let timerInterval;
+let secondsElapsed = 0;
+let isTimerPaused = false;
+
+// --- INITIALIZATION ---
+function init() {
+    renderNav();
+}
+
+function startQuiz() {
+    document.getElementById('home-screen').classList.add('hidden');
+    document.getElementById('quiz-interface').classList.remove('hidden');
+    loadQuestion(0);
+    startTimer();
+    renderNav();
+}
+
+// --- CORE FUNCTIONS ---
+function loadQuestion(index) {
+    currentQIndex = index;
+    const q = quizData.questions[index];
+    
+    document.getElementById('header-q-num').innerText = `Question ${index + 1}/${quizData.questions.length}`;
+    updateNavSelection();
+
+    const container = document.getElementById('question-container');
+    const existingAnswers = userAnswers[q.id] || [];
+    
+    let html = `
+        <div class="question-card">
+            <div class="q-header">
+                <span>UE2 BIOSTATISTIQUES</span>
+                <span>${q.id}</span>
+            </div>
+            <div class="q-text">${q.text}</div>
+            <div class="items-list">
+    `;
+
+    q.items.forEach(item => {
+        const isSelected = existingAnswers.includes(item.id);
+        html += `
+            <div class="item-row ${isSelected ? 'selected' : ''}" onclick="toggleItem('${item.id}', this)">
+                <div class="checkbox">${isSelected ? '✓' : ''}</div>
+                <div class="item-letter">${item.id}</div>
+                <div>${item.text}</div>
+            </div>
+        `;
+    });
+
+    html += `</div></div>`;
+    container.innerHTML = html;
+}
+
+function toggleItem(itemId, element) {
+    const qId = quizData.questions[currentQIndex].id;
+    if (!userAnswers[qId]) userAnswers[qId] = [];
+    
+    const idx = userAnswers[qId].indexOf(itemId);
+    if (idx === -1) {
+        userAnswers[qId].push(itemId);
+        element.classList.add('selected');
+        element.querySelector('.checkbox').innerText = '✓';
+    } else {
+        userAnswers[qId].splice(idx, 1);
+        element.classList.remove('selected');
+        element.querySelector('.checkbox').innerText = '';
+    }
+}
+
+function validateAnswer() {
+    const q = quizData.questions[currentQIndex];
+    const userAns = userAnswers[q.id] || [];
+    
+    // Logic: 0 errors=1pt, 1 error=0.5pt, 2+ errors=0pt
+    let errors = 0;
+    
+    q.items.forEach(item => {
+        const isChecked = userAns.includes(item.id);
+        if (isChecked && !item.correct) errors++; // FP
+        if (!isChecked && item.correct) errors++; // FN
+    });
+
+    let score = 0;
+    let scoreClass = 'danger';
+    let scoreText = '0 POINT';
+    
+    if (errors === 0) { score = 1; scoreClass = 'success'; scoreText = '✅ 1 POINT'; }
+    else if (errors === 1) { score = 0.5; scoreClass = 'warning'; scoreText = '⚠️ 0.5 POINT'; }
+    else { score = 0; scoreClass = 'danger'; scoreText = '❌ 0 POINT'; }
+
+    q.score = score;
+    q.errors = errors;
+
+    showFeedback(q, userAns, score, scoreText, scoreClass);
+}
+
+function showFeedback(q, userAns, score, scoreText, scoreClass) {
+    pauseTimer();
+    const overlay = document.getElementById('feedback-overlay');
+    const summary = document.getElementById('feedback-summary');
+    const details = document.getElementById('feedback-details');
+    const actionArea = document.getElementById('feedback-action-area');
+    
+    summary.innerHTML = `
+        <div class="score-badge" style="color: var(--${scoreClass})">${scoreText}</div>
+        <div style="font-size: 1.2rem; margin-bottom: 1rem; color: var(--text-main);">${q.errors} erreur(s) commise(s)</div>
+        <div style="color: var(--text-muted)">${score === 1 ? 'Bravo ! Réponse parfaite.' : (score === 0.5 ? 'Attention, presque bon !' : 'À revoir d\'urgence.')}</div>
+    `;
+
+    let detailsHtml = '';
+    q.items.forEach(item => {
+        const isChecked = userAns.includes(item.id);
+        let statusClass = '';
+        let icon = '';
+        let statusText = '';
+
+        if (item.correct) {
+            if (isChecked) { statusClass = 'correct'; icon = '✅'; statusText = 'Correct (Coché)'; }
+            else { statusClass = 'error'; icon = '⚠️'; statusText = 'Erreur (Oublié)'; }
+        } else {
+            if (isChecked) { statusClass = 'error'; icon = '❌'; statusText = 'Erreur (Coché à tort)'; }
+            else { statusClass = 'correct'; icon = '✓'; statusText = 'Correct (Non coché)'; }
+        }
+
+        detailsHtml += `
+            <div class="detail-card ${statusClass}">
+                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-weight:bold;">
+                    <span>${icon} Item ${item.id} - ${statusText}</span>
+                    <span style="color: ${item.correct ? 'var(--success)' : 'var(--danger)'}">${item.correct ? 'VRAI' : 'FAUX'}</span>
+                </div>
+                <div style="font-style: italic; margin-bottom: 0.5rem; color: var(--text-main);">"${item.text}"</div>
+                <div style="padding-top: 0.5rem; border-top: 1px dashed var(--border); color: var(--text-muted);">
+                    <strong>Explication :</strong> ${item.explication}
+                </div>
+            </div>
+        `;
+    });
+    details.innerHTML = detailsHtml;
+
+    const isLastQuestion = currentQIndex === quizData.questions.length - 1;
+    if (isLastQuestion) {
+        actionArea.innerHTML = `<button class="btn-primary" onclick="finishQuiz()" style="font-size: 1.2rem; padding: 1rem 3rem; background-color: var(--success);">TERMINER & VOIR RÉSULTATS 🏁</button>`;
+    } else {
+        actionArea.innerHTML = `<button class="btn-primary" onclick="nextQuestion()" style="font-size: 1.2rem; padding: 1rem 3rem;">Question Suivante →</button>`;
+    }
+
+    overlay.classList.add('active');
+    updateNavColor(currentQIndex, scoreClass);
+}
+
+function nextQuestion() {
+    document.getElementById('feedback-overlay').classList.remove('active');
+    
+    resumeTimer();
+    
+    if (currentQIndex < quizData.questions.length - 1) {
+        loadQuestion(currentQIndex + 1);
+    }
+}
+
+function finishQuiz() {
+    document.getElementById('feedback-overlay').classList.remove('active');
+    document.getElementById('quiz-interface').classList.add('hidden');
+    
+    const summaryScreen = document.getElementById('summary-screen');
+    summaryScreen.classList.remove('hidden');
+    summaryScreen.style.display = 'block'; 
+    
+    let totalScore = 0;
+    quizData.questions.forEach(q => { totalScore += (q.score || 0); });
+    
+    document.getElementById('final-score').innerText = `${totalScore} / 20`;
+    document.getElementById('final-percent').innerText = `${(totalScore/20*100).toFixed(1)}%`;
+    document.getElementById('final-time').innerText = formatTime(secondsElapsed);
+
+    const list = document.getElementById('summary-details');
+    let fullHtml = '';
+
+    quizData.questions.forEach((q, i) => {
+        const userAns = userAnswers[q.id] || [];
+        const scoreColor = q.score === 1 ? 'var(--success)' : (q.score === 0.5 ? 'var(--warning)' : 'var(--danger)');
+        const scoreBadge = q.score === 1 ? '✅ 1 Point' : (q.score === 0.5 ? '⚠️ 0.5 Point' : '❌ 0 Point');
+
+        let qBlock = `
+        <div class="summary-block">
+            <h3>
+                <span>Q${i+1}</span>
+                <span class="score-tag" style="background:${scoreColor}">${scoreBadge}</span>
+            </h3>
+            <p style="margin-bottom:1rem; color:var(--text-main); font-weight:600;">${q.text}</p>
+            <div>
+        `;
+
+        q.items.forEach(item => {
+            const isChecked = userAns.includes(item.id);
+            let icon = '';
+            let color = '';
+            
+            if (item.correct) {
+                if (isChecked) { icon = '✅'; color = 'var(--success)'; } 
+                else { icon = '⚠️'; color = 'var(--warning)'; } 
+            } else {
+                if (isChecked) { icon = '❌'; color = 'var(--danger)'; } 
+                else { icon = '✓'; color = 'var(--text-muted)'; } 
+            }
+
+            qBlock += `
+            <div class="summary-item-row">
+                <div class="summary-item-status">${icon}</div>
+                <div class="summary-item-text">
+                    <span style="color:${color}; font-weight:bold; margin-right:0.5rem;">${item.id}</span>
+                    <span style="color:var(--text-main);">${item.text}</span>
+                    ${isChecked ? '<span class="user-action ua-checked">COCHÉ</span>' : ''}
+                    <div class="summary-item-expl">${item.explication}</div>
+                </div>
+            </div>`;
+        });
+
+        qBlock += `</div></div>`;
+        fullHtml += qBlock;
+    });
+
+    list.innerHTML = fullHtml;
+}
+
+function copyCorrection() {
+    let text = `RAPPORT DE CORRECTION - ${quizData.title}\n`;
+    text += `Score: ${document.getElementById('final-score').innerText} (${document.getElementById('final-percent').innerText})\n`;
+    text += `Temps: ${document.getElementById('final-time').innerText}\n`;
+    text += `--------------------------------------------------\n\n`;
+
+    quizData.questions.forEach((q, i) => {
+        const userAns = userAnswers[q.id] || [];
+        text += `QUESTION ${i+1} : ${q.text}\n`;
+        text += `Note : ${q.score || 0}/1 pt\n`;
+        
+        q.items.forEach(item => {
+            const isChecked = userAns.includes(item.id);
+            let status = '';
+            
+            if (item.correct) {
+                status = isChecked ? "✅ VRAI (Coché)" : "⚠️ VRAI (Oublié)";
+            } else {
+                status = isChecked ? "❌ FAUX (Coché à tort)" : "✓ FAUX (Non coché)";
+            }
+
+            text += `   [${item.id}] ${status}\n`;
+            text += `   ↳ ${item.explication}\n`;
+        });
+        text += `\n--------------------------------------------------\n\n`;
+    });
+
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('button[onclick="copyCorrection()"]');
+        const originalText = btn.innerText;
+        btn.innerText = "✅ Copié !";
+        setTimeout(() => btn.innerText = originalText, 2000);
+    });
+}
+
+// --- UTILITIES ---
+function flagQuestion() {
+    const qId = quizData.questions[currentQIndex].id;
+    if (flaggedQuestions.has(qId)) flaggedQuestions.delete(qId);
+    else flaggedQuestions.add(qId);
+    renderNav();
+}
+
+function toggleNav() {
+    document.getElementById('nav-panel').classList.toggle('open');
+}
+
+function renderNav() {
+    const grid = document.getElementById('nav-grid');
+    grid.innerHTML = quizData.questions.map((q, i) => {
+        const isFlagged = flaggedQuestions.has(q.id);
+        return `<button class="nav-btn ${i === currentQIndex ? 'current' : ''}" onclick="loadQuestion(${i}); toggleNav();">
+            ${isFlagged ? '⭐' : ''} ${i+1}
+        </button>`;
+    }).join('');
+}
+
+function updateNavColor(index, status) {
+    const btn = document.getElementById('nav-grid').children[index];
+    btn.classList.remove('success', 'warning', 'danger');
+    btn.classList.add(status);
+}
+
+function updateNavSelection() {
+    const btns = document.querySelectorAll('.nav-btn');
+    btns.forEach((b, i) => {
+        if (i === currentQIndex) b.classList.add('current');
+        else b.classList.remove('current');
+    });
+}
+
+function startTimer() {
+    timerInterval = setInterval(() => {
+        if (!isTimerPaused) {
+            secondsElapsed++;
+            document.getElementById('timer').innerText = formatTime(secondsElapsed);
+        }
+    }, 1000);
+}
+
+function pauseTimer() {
+    isTimerPaused = true;
+    document.getElementById('timer').classList.add('paused');
+}
+
+function resumeTimer() {
+    isTimerPaused = false;
+    document.getElementById('timer').classList.remove('paused');
+}
+
+function formatTime(sec) {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+}
+
+function toggleTheme() {
+    if (document.body.getAttribute('data-theme') === 'light') {
+        document.body.removeAttribute('data-theme');
+        document.body.setAttribute('data-theme', 'dark');
+    } else {
+        document.body.setAttribute('data-theme', 'light');
+    }
+}
+
+document.addEventListener('keydown', (e) => {
+    if(document.getElementById('quiz-interface').classList.contains('hidden')) return;
+    if (e.key === 'f') flagQuestion();
+});
+
+init();
+</script>
+</body>
+</html>
