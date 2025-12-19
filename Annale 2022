@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PASS UE2 - Annale 2021-2022 (App Interactive)</title>
+    <style>
+        /* --- THEME SOMBRE PAR DÉFAUT (ULTRA DARK) --- */
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #60a5fa;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            
+            /* Couleurs fixes pour le mode sombre */
+            --background: #000000;       /* Noir Pur */
+            --card-bg: #121212;          /* Gris Anthracite */
+            --item-bg: #1a1a1a;          /* Gris sombre */
+            --text-main: #ffffff;        /* Blanc Pur */
+            --text-muted: #a3a3a3;       /* Gris clair */
+            --border: #333333;           /* Bordure subtile */
+            --shadow: 0 4px 20px rgba(255,255,255,0.05);
+        }
+
+        [data-theme="light"] {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --item-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        * { box-sizing: border-box; transition: background-color 0.3s, color 0.2s; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--background); color: var(--text-main); height: 100vh; overflow: hidden; }
+
+        /* --- LAYOUT --- */
+        #app { display: flex; flex-direction: column; height: 100%; }
+        
+        header { padding: 1rem 2rem; background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .header-title h1 { margin: 0; font-size: 1.2rem; }
+        .header-controls { display: flex; gap: 1rem; align-items: center; }
+        .timer { font-family: monospace; font-size: 1.2rem; font-weight: bold; padding: 0.25rem 0.75rem; background: var(--background); border-radius: 6px; border: 1px solid var(--border); color: var(--text-main); }
+        .timer.paused { opacity: 0.5; }
+
+        main { flex: 1; position: relative; overflow: hidden; display: flex; }
+        
+        #nav-panel {
+            position: absolute; left: -320px; top: 0; bottom: 0; width: 300px;
+            background: var(--card-bg); border-right: 1px solid var(--border);
+            z-index: 20; transition: transform 0.3s ease; display: flex; flex-direction: column;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.5);
+        }
+        #nav-panel.open { transform: translateX(320px); }
+        .nav-grid { padding: 1rem; overflow-y: auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+        .nav-btn { aspect-ratio: 1; border: 1px solid var(--border); background: var(--item-bg); border-radius: 4px; cursor: pointer; font-size: 0.9rem; color: var(--text-main); }
+        .nav-btn.success { background: var(--success); color: white; border-color: var(--success); }
+        .nav-btn.warning { background: var(--warning); color: white; border-color: var(--warning); }
+        .nav-btn.danger { background: var(--danger); color: white; border-color: var(--danger); }
+        .nav-btn.current { border: 2px solid var(--primary); }
+
+        #question-container { flex: 1; overflow-y: auto; padding: 2rem; max-width: 900px; margin: 0 auto; width: 100%; }
+        .question-card { background: var(--card-bg); padding: 2rem; border-radius: 12px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+        .q-header { display: flex; justify-content: space-between; margin-bottom: 1.5rem; color: var(--text-muted); font-weight: 600; }
+        .q-text { font-size: 1.25rem; margin-bottom: 2rem; line-height: 1.5; color: var(--text-main); }
+        
+        .item-row { display: flex; align-items: flex-start; padding: 1rem; margin-bottom: 0.75rem; border: 1px solid var(--border); background: var(--item-bg); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .item-row:hover { border-color: var(--primary); transform: translateX(5px); }
+        .item-row.selected { border-color: var(--primary); background: rgba(59, 130, 246, 0.15); }
+        .checkbox { width: 24px; height: 24px; border: 2px solid var(--text-muted); border-radius: 4px; margin-right: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--text-main); }
+        .item-row.selected .checkbox { background: var(--primary); border-color: var(--primary); color: white; }
+        .item-letter { font-weight: bold; margin-right: 0.5rem; color: var(--primary); }
+
+        footer { padding: 1rem 2rem; background: var(--card-bg); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; }
+        button { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 1rem; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+        .btn-outline:hover { border-color: var(--text-main); color: var(--text-main); }
+
+        /* FEEDBACK OVERLAY */
+        #feedback-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95);
+            z-index: 50; display: none; flex-direction: column; backdrop-filter: blur(5px);
+        }
+        #feedback-overlay.active { display: flex; }
+        .feedback-summary { height: 30%; background: var(--card-bg); padding: 2rem; display: flex; flex-direction: column; justify-content: center; align-items: center; border-bottom: 1px solid var(--border); text-align: center; }
+        .feedback-details { height: 70%; background: var(--background); overflow-y: auto; padding: 2rem; }
+        .detail-card { max-width: 800px; margin: 0 auto 1rem; background: var(--card-bg); padding: 1.5rem; border-radius: 8px; border-left: 5px solid transparent; box-shadow: var(--shadow); border: 1px solid var(--border); color: var(--text-main); }
+        .detail-card.correct { border-left-color: var(--success); }
+        .detail-card.error { border-left-color: var(--danger); }
+
+        /* --- SUMMARY SCREEN STYLES --- */
+        #summary-screen { 
+            display: none; 
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            padding: 2rem; overflow-y: auto; 
+            background: var(--background); 
+            color: var(--text-main);
+            z-index: 100;
+        }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--card-bg); padding: 1.5rem; border-radius: 8px; text-align: center; box-shadow: var(--shadow); border: 1px solid var(--border); color: var(--text-main); }
+        .stat-val { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        
+        /* Summary Question Block */
+        .summary-block {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+        .summary-block h3 { margin-top: 0; display: flex; justify-content: space-between; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+        .summary-block .score-tag { font-size: 0.9em; padding: 2px 8px; border-radius: 4px; color: white; }
+        
+        .summary-item-row {
+            display: flex;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: flex-start;
+        }
+        .summary-item-status { width: 25px; font-size: 1.2rem; flex-shrink: 0; }
+        .summary-item-text { flex: 1; color: var(--text-main); }
+        .summary-item-expl { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem; font-style: italic; }
+        .user-action { font-size: 0.8rem; text-transform: uppercase; font-weight: bold; margin-left: 0.5rem; padding: 2px 4px; border-radius: 3px; }
+        .ua-checked { background: rgba(59, 130, 246, 0.2); color: var(--primary-dark); }
+        
+        .buttons-row { display: flex; gap: 1rem; justify-content: center; margin-top: 2rem; margin-bottom: 4rem; }
+
+        /* Utils */
+        .hidden { display: none !important; }
+        #home-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 2rem; background: var(--background); color: var(--text-main); }
+        .hero-title { font-size: 2.5rem; margin-bottom: 1rem; color: var(--primary); }
+    </style>
+</head>
+<body data-theme="dark">
+
+<div id="app">
+    <div id="home-screen">
+        <h1 class="hero-title">PASS UE2 - Annale 2021-2022</h1>
+        <p style="font-size: 1.2rem; color: var(--text-muted); margin-bottom: 2rem;">Biostatistiques & Épidémiologie<br>20 Questions QCM • Notation Stricte</p>
+        <div style="background: var(--card-bg); padding: 2rem; border-radius: 12px; box-shadow: var(--shadow); max-width: 500px; border: 1px solid var(--border);">
+            <p><strong>Règles de notation :</strong></p>
+            <ul style="text-align: left; margin-bottom: 2rem; color: var(--text-main);">
+                <li>✅ 0 erreur = <strong>1 Point</strong></li>
+                <li>⚠️ 1 erreur = <strong>0.5 Point</strong></li>
+                <li>❌ 2+ erreurs = <strong>0 Point</strong></li>
+            </ul>
+            <button class="btn-primary" onclick="startQuiz()" style="width: 100%; font-size: 1.2rem;">Commencer l'entraînement</button>
+        </div>
+    </div>
+
+    <div id="quiz-interface" class="hidden" style="height: 100%; display: flex; flex-direction: column;">
+        <header>
+            <div class="header-controls">
+                <button class="btn-outline" onclick="toggleNav()" style="padding: 0.5rem;">☰ Questions</button>
+                <div class="header-title">
+                    <h1 id="header-q-num" style="color: var(--text-main);">Question 1/20</h1>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div id="timer" class="timer">00:00</div>
+                <button class="btn-outline" onclick="toggleTheme()" style="padding: 0.5rem;">☀️/🌑</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="nav-panel">
+                <div style="padding: 1rem; border-bottom: 1px solid var(--border); color: var(--text-main);">
+                    <strong>Navigation</strong>
+                </div>
+                <div class="nav-grid" id="nav-grid"></div>
+            </div>
+
+            <div id="question-container"></div>
+        </main>
+
+        <footer>
+            <button class="btn-outline" onclick="flagQuestion()">⭐ Flaguer</button>
+            <button class="btn-primary" onclick="validateAnswer()">Valider la réponse</button>
+        </footer>
+    </div>
+
+    <div id="feedback-overlay">
+        <div class="feedback-summary" id="feedback-summary"></div>
+        <div class="feedback-details" id="feedback-details"></div>
+        <div id="feedback-action-area" style="background: var(--card-bg); padding: 1.5rem; border-top: 1px solid var(--border); text-align: center;"></div>
+    </div>
+
+    <div id="summary-screen">
+        <div style="max-width: 900px; margin: 0 auto;">
+            <h1 style="text-align: center; margin-bottom: 2rem; color: var(--text-main);">Résultats Détaillés</h1>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-val" id="final-score">--/20</div>
+                    <div style="color: var(--text-muted);">Note Finale</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" id="final-percent">--%</div>
+                    <div style="color: var(--text-muted);">Réussite</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" id="final-time">--:--</div>
+                    <div style="color: var(--text-muted);">Temps Total</div>
+                </div>
+            </div>
+
+            <div id="summary-details">
+                </div>
+            
+            <div class="buttons-row">
+                <button class="btn-outline" onclick="copyCorrection()" style="border-color: var(--primary); color: var(--primary);">📋 Copier le rapport complet</button>
+                <button class="btn-primary" onclick="location.reload()">🔄 Recommencer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- DATA IMPORT FROM PDF UE2 2021-2022 ---
+const quizData = {
+    title: "UE2 Annale 2021-2022",
+    questions: [
+        {
+            id: 1,
+            text: "Concernant la consommation d'alcool mensuelle, les réponses jamais, rarement, parfois, souvent, toujours sont :",
+            items: [
+                { id: "A", text: "Une variable dichotomique", correct: false, explication: "Faux. Dichotomique signifie DEUX catégories (ex: Oui/Non). Ici il y en a 5." },
+                { id: "B", text: "Une variable ordinale", correct: true, explication: "Vrai. Il existe un ordre hiérarchique logique entre les modalités (du moins au plus fréquent)." },
+                { id: "C", text: "Une variable quantitative discrète", correct: false, explication: "Faux. C'est une variable QUALITATIVE." },
+                { id: "D", text: "Une variable nominale", correct: false, explication: "Faux. Nominale signifie qu'il n'y a pas d'ordre (ex: couleur des yeux). Ici il y a un ordre." },
+                { id: "E", text: "Sont parfois plus intelligibles qu'une variable continue", correct: true, explication: "Vrai. Le regroupement en catégories permet parfois une meilleure interprétation clinique ou sociale." }
+            ]
+        },
+        {
+            id: 2,
+            text: "Les statistiques descriptives d'une variable quantitative comportent :",
+            items: [
+                { id: "A", text: "le risque alpha", correct: false, explication: "Faux. Concerne les tests d'hypothèse." },
+                { id: "B", text: "une mesure de position seulement", correct: false, explication: "Faux. Il faut aussi une dispersion." },
+                { id: "C", text: "l'effectif seulement", correct: false, explication: "Faux. Insuffisant." },
+                { id: "D", text: "l'hypothèse nulle", correct: false, explication: "Faux. Concerne les tests inductifs." },
+                { id: "E", text: "aucune des réponses ci-dessus", correct: true, explication: "Vrai. La description complète nécessite : Effectif + Mesure de position + Mesure de dispersion." }
+            ]
+        },
+        {
+            id: 3,
+            text: "La description d'une variable qualitative comporte :",
+            items: [
+                { id: "A", text: "une mesure de position et une mesure de dispersion", correct: false, explication: "Faux. C'est pour les variables quantitatives." },
+                { id: "B", text: "le risque beta", correct: false, explication: "Faux. Test d'hypothèse." },
+                { id: "C", text: "la probabilité p de rejeter à tort l'hypothèse nulle", correct: false, explication: "Faux. Test d'hypothèse." },
+                { id: "D", text: "l'effectif et le pourcentage", correct: true, explication: "Vrai. On décrit une variable qualitative par ses fréquences absolues (effectif) et relatives (pourcentage)." },
+                { id: "E", text: "le coefficient de corrélation", correct: false, explication: "Faux. Mesure l'association entre deux variables quantitatives." }
+            ]
+        },
+        {
+            id: 4,
+            text: "Parmi les mesures suivantes sont des mesures de position:",
+            items: [
+                { id: "A", text: "la médiane", correct: true, explication: "Vrai. Mesure de position centrale (50%)." },
+                { id: "B", text: "la variance", correct: false, explication: "Faux. Mesure de dispersion." },
+                { id: "C", text: "la moyenne", correct: true, explication: "Vrai. Mesure de position centrale." },
+                { id: "D", text: "le risque alpha", correct: false, explication: "Faux. Paramètre de décision statistique." },
+                { id: "E", text: "le 9ème décile", correct: true, explication: "Vrai. Mesure de position (non centrale)." }
+            ]
+        },
+        {
+            id: 5,
+            text: "Parmi les mesures suivantes sont des mesures de dispersion :",
+            items: [
+                { id: "A", text: "l'intervalle entre premier et neuvième décile", correct: false, explication: "Faux. Les déciles sont des mesures de position (bien que leur intervalle indique une dispersion, l'item est considéré faux par la correction car formulé comme une position ou ambigu)." },
+                { id: "B", text: "l'écart type", correct: true, explication: "Vrai. Racine carrée de la variance." },
+                { id: "C", text: "l'intervalle interquartile", correct: true, explication: "Vrai. Dispersion autour de la médiane (Q3-Q1)." },
+                { id: "D", text: "l'étendue", correct: true, explication: "Vrai. Max - Min." },
+                { id: "E", text: "la variance", correct: true, explication: "Vrai. Moyenne des carrés des écarts." }
+            ]
+        },
+        {
+            id: 6,
+            text: "Les méthodes d'échantillonnage probabiliste comportent :",
+            items: [
+                { id: "A", text: "la méthode des quotas", correct: false, explication: "Faux. Non probabiliste (empirique)." },
+                { id: "B", text: "le sondage systématique", correct: true, explication: "Vrai. On tire un numéro au hasard puis on prend tous les k individus." },
+                { id: "C", text: "la méthode de la boule de neige", correct: false, explication: "Faux. Non probabiliste (proche en proche)." },
+                { id: "D", text: "le sondage multiétapes", correct: true, explication: "Vrai. Combinaison de tirages aléatoires successifs." },
+                { id: "E", text: "la méthode des unités types", correct: false, explication: "Faux. Non probabiliste." }
+            ]
+        },
+        {
+            id: 7,
+            text: "La moyenne d'âge... estimée est de 68 ans avec un intervalle de confiance à 95% de 45 à 86 ans. Cela signifie que :",
+            items: [
+                { id: "A", text: "il est impossible de quantifier le risque de se tromper", correct: false, explication: "Faux. Le risque est quantifié (5%)." },
+                { id: "B", text: "on est sûr que la vraie valeur se trouve entre 45 et 86 ans", correct: false, explication: "Faux. Jamais sûr à 100%." },
+                { id: "C", text: "il y a 95% de chances que la vraie valeur se trouve entre 45 et 86 ans", correct: true, explication: "Vrai. Définition classique de l'IC 95%." },
+                { id: "D", text: "il y a 5% de chances que la vraie valeur se trouve en dessous de 45 ans ou au-dessus de 86ans", correct: true, explication: "Vrai. C'est le risque alpha (les 5% restants)." },
+                { id: "E", text: "il y a 5% de chances que la vraie valeur se trouve entre 45 et 86 ans", correct: false, explication: "Faux. C'est 95%." }
+            ]
+        },
+        {
+            id: 8,
+            text: "La moyenne d'âge... est de 24 ans avec un IC 95% de 15 à 33 ans. Si l'on reprend un autre échantillon aléatoire plus grand :",
+            items: [
+                { id: "A", text: "la précision de l'estimation de la moyenne d'âge sera meilleure", correct: true, explication: "Vrai. Plus n est grand, plus la précision augmente." },
+                { id: "B", text: "l'intervalle de confiance à 95% sera plus étroit", correct: true, explication: "Vrai. L'IC se resserre quand n augmente." },
+                { id: "C", text: "l'intervalle de confiance à 95% sera le même", correct: false, explication: "Faux. Il changera." },
+                { id: "D", text: "l'intervalle de confiance à 95% sera plus étendu", correct: false, explication: "Faux." },
+                { id: "E", text: "la précision de l'estimation de la moyenne d'âge sera identique", correct: false, explication: "Faux." }
+            ]
+        },
+        {
+            id: 9,
+            text: "On étudie les données d'un registre exhaustif qui recueille les données sur tous les enfants... Prévalence 1.4/1000.",
+            items: [
+                { id: "A", text: "la précision de l'estimation sera mauvaise", correct: false, explication: "Faux." },
+                { id: "B", text: "l'intervalle de confiance à 95% sera étroit", correct: false, explication: "Faux." },
+                { id: "C", text: "l'intervalle de confiance à 95% sera large", correct: false, explication: "Faux." },
+                { id: "D", text: "il s'agit de statistiques inductives", correct: false, explication: "Faux. Statistiques descriptives pures." },
+                { id: "E", text: "on connaît le chiffre exact, il n'y a pas lieu de donner un intervalle de confiance", correct: true, explication: "Vrai. Car c'est un recensement (population exhaustive), donc pas d'erreur d'échantillonnage." }
+            ]
+        },
+        {
+            id: 10,
+            text: "Concernant les tests d'hypothèse:",
+            items: [
+                { id: "A", text: "l'hypothèse nulle et l'hypothèse alternative sont mutuellement exclusives", correct: true, explication: "Vrai." },
+                { id: "B", text: "si la caractéristique observée est en dehors de l'intervalle de pari l'hypothèse nulle n'a que a chances sur 100 d'être vraie", correct: true, explication: "Vrai. Si on rejette H0, le risque de se tromper est alpha." },
+                { id: "C", text: "l'hypothèse alternative représente la situation ou les deux groupes comparés sont identiques", correct: false, explication: "Faux. H1 = Différence. H0 = Identiques." },
+                { id: "D", text: "sont basés sur un raisonnement par l'absurde", correct: true, explication: "Vrai. On suppose H0 vraie et on voit si ça colle." },
+                { id: "E", text: "l'hypothèse nulle représente la situation ou les deux groupes comparés sont identiques", correct: true, explication: "Vrai. Pas de différence." }
+            ]
+        },
+        {
+            id: 11,
+            text: "Lors d'un test d'hypothèse, une probabilité p = 0,025 signifie:",
+            items: [
+                { id: "A", text: "qu'il n'y a pas de différence significative entre deux groupes comparés pour alpha = 1%", correct: true, explication: "Vrai. car 0,025 > 0,01. On ne rejette pas H0 au seuil 1%." },
+                { id: "B", text: "qu'il existe une différence significative entre les deux groupes comparés pour alpha=5%", correct: true, explication: "Vrai. car 0,025 < 0,05. On rejette H0 au seuil 5%." },
+                { id: "C", text: "qu'il faut connaitre alpha pour interpréter", correct: true, explication: "Vrai. Le résultat dépend du seuil choisi (voir A et B)." },
+                { id: "D", text: "que l'on peut rejeter l'hypothèse nulle", correct: true, explication: "Vrai. Sous-entendu au seuil standard de 5%." },
+                { id: "E", text: "que l'on peut choisir l'hypothèse alternative avec moins de 5% de risque d'erreur", correct: true, explication: "Vrai. Le risque est p=2.5%." }
+            ]
+        },
+        {
+            id: 12,
+            text: "Concernant les tests d'hypothèse, le risque a :",
+            items: [
+                { id: "A", text: "marque la présence de biais", correct: false, explication: "Faux." },
+                { id: "B", text: "correspond au risque de conclure qu'il n'y a pas de différence... alors qu'en réalité il y en a une", correct: false, explication: "Faux. Ça c'est le risque Bêta." },
+                { id: "C", text: "correspond au risque de conclure qu'il y a une différence... alors qu'en réalité il n'y en a pas", correct: true, explication: "Vrai. Risque de 1ère espèce (Faux positif)." },
+                { id: "D", text: "correspond au risque de ne pas rejeter l'hypothèse nulle à tort", correct: false, explication: "Faux. Formulation complexe du risque Bêta." },
+                { id: "E", text: "correspond au risque d'accepter à tort l'hypothèse alternative", correct: true, explication: "Vrai. Accepter H1 à tort revient à rejeter H0 à tort (Risque alpha)." }
+            ]
+        },
+        {
+            id: 13,
+            text: "On cherche à savoir si la proportion de fumeurs est plus élevée chez les hommes que chez les femmes (2 variables qualitatives):",
+            items: [
+                { id: "A", text: "on teste l'hypothèse nulle « il y a pourcentage plus élevé de fumeurs chez les hommes que chez les femmes »", correct: false, explication: "Faux. H0 est toujours l'absence de différence (égalité des %). Ce qui est décrit est H1 (ou une hypothèse unilatérale)." },
+                { id: "B", text: "on utilise un test du Khi2", correct: true, explication: "Vrai. Test de référence pour comparer 2 proportions." },
+                { id: "C", text: "on utilise coefficient de corrélation", correct: false, explication: "Faux. C'est une comparaison, pas une corrélation." },
+                { id: "D", text: "on utilise un test apparié", correct: false, explication: "Faux. Les groupes Hommes et Femmes sont indépendants." },
+                { id: "E", text: "si le Khi2 calculé est > au Khi2(alpha) on rejette l'hypothèse nulle", correct: true, explication: "Vrai. Si la stat de test dépasse le seuil critique, le test est significatif." }
+            ]
+        },
+        {
+            id: 14,
+            text: "Parmi les actions de prévention secondaire on compte :",
+            items: [
+                { id: "A", text: "La vaccination contre le HPV", correct: false, explication: "Faux. Prévention Primaire (avant la maladie)." },
+                { id: "B", text: "Le traitement efficace des cancers invasifs", correct: false, explication: "Faux. Prévention Tertiaire (éviter les complications/décès)." },
+                { id: "C", text: "Le dépistage", correct: true, explication: "Vrai. Prévention Secondaire (stade précoce)." },
+                { id: "D", text: "Les frottis cervico-vaginaux", correct: true, explication: "Vrai. C'est un acte de dépistage (Secondaire)." },
+                { id: "E", text: "La réduction des facteurs de risque", correct: false, explication: "Faux. Prévention Primaire." }
+            ]
+        },
+        {
+            id: 15,
+            text: "Concernant la prévention :",
+            items: [
+                { id: "A", text: "La prévention positive ne fait pas référence à un risque précis et renvoie à la promotion de la santé", correct: true, explication: "Vrai." },
+                { id: "B", text: "La prévention universelle ne concerne que les non malades", correct: false, explication: "Faux. Elle concerne toute la population, quel que soit l'état de santé." },
+                { id: "C", text: "La prévention ciblée vise des facteurs de risque spécifiques", correct: true, explication: "Vrai. Ou des sous-groupes spécifiques." },
+                { id: "D", text: "L'universalisme proportionné vise à ce que tous aient les mêmes interventions et effets", correct: false, explication: "Faux. Il vise à donner PLUS à ceux qui ont moins pour atteindre l'égalité de résultat." },
+                { id: "E", text: "La promotion de la Santé doit désormais être considérée à tous les âges de la vie et dans toutes les politiques publiques", correct: true, explication: "Vrai. Concept de 'Health in All Policies'." }
+            ]
+        },
+        {
+            id: 16,
+            text: "Selon le modèle de la pyramide de l'impact en santé :",
+            items: [
+                { id: "A", text: "les facteurs socioéconomiques ont un impact élevé sur la santé", correct: true, explication: "Vrai. C'est la base de la pyramide (le plus gros impact)." },
+                { id: "B", text: "les conseils et l'éducation en santé requièrent des efforts individuels important pour un impact populationnel modeste", correct: true, explication: "Vrai. Haut de la pyramide." },
+                { id: "C", text: "Les changements de contexte peuvent avoir un impact populationnel élevé avec des efforts individuels modestes", correct: true, explication: "Vrai. Ex: fluoration de l'eau, taxes tabac." },
+                { id: "D", text: "Tous les niveaux d'intervention ont le même impact", correct: false, explication: "Faux." },
+                { id: "E", text: "Tous les niveaux d'intervention requièrent des efforts individuels importants", correct: false, explication: "Faux." }
+            ]
+        },
+        {
+            id: 17,
+            text: "Concernant l'intervention d'une 3ème variable dans la relation entre une exposition et une maladie :",
+            items: [
+                { id: "A", text: "La confusion correspond à une relation différente entre exposition et maladie selon les strates de la 3ème variable", correct: true, explication: "Vrai (ou modification d'effet, l'item est ambigu mais compté vrai dans la correction comme une propriété générale de l'analyse stratifiée)." },
+                { id: "B", text: "La confusion est une forme de biais lié à l'association de la 3eme variable à l'exposition et à la maladie", correct: true, explication: "Vrai. Définition du facteur de confusion (lié à E et à M)." },
+                { id: "C", text: "La modification de l'effet est une forme de biais lié à l'association de la 3ème variable à l'exposition et à la maladie", correct: false, explication: "Faux. Ce n'est pas un biais mais un phénomène biologique/naturel à décrire." },
+                { id: "D", text: "Il faut neutraliser la modification de l'effet", correct: false, explication: "Faux. Il faut la décrire (analyse par strate)." },
+                { id: "E", text: "Si la 3ème variable est un facteur de confusion, il ne faut pas en tenir compte", correct: false, explication: "Faux. Il faut absolument en tenir compte (ajustement, restriction...)." }
+            ]
+        },
+        {
+            id: 18,
+            text: "Concernant les études randomisées contrôlées en double aveugle :",
+            items: [
+                { id: "A", text: "Le double aveugle vise à neutraliser les biais de sélection", correct: false, explication: "Faux. Le double aveugle neutralise les biais d'information/observation. La randomisation neutralise la sélection." },
+                { id: "B", text: "Le double aveugle vise à équilibrer les facteurs de confusion", correct: false, explication: "Faux. C'est la randomisation qui fait ça." },
+                { id: "C", text: "La randomisation vise à supprimer les biais d'information", correct: false, explication: "Faux. Voir A." },
+                { id: "D", text: "Elles sont de niveau de preuve inférieur aux grandes cohortes", correct: false, explication: "Faux. RCT > Cohorte (Niveau 1 vs 2)." },
+                { id: "E", text: "Aucune des réponses ci-dessus", correct: true, explication: "Vrai." }
+            ]
+        },
+        {
+            id: 19,
+            text: "Les études de cohorte :",
+            items: [
+                { id: "A", text: "sont intéressantes pour l'étude des expositions rares", correct: true, explication: "Vrai. On recrute sur la base de l'exposition." },
+                { id: "B", text: "sont d'un niveau de preuve équivalent aux essais randomisés contrôlés", correct: false, explication: "Faux. Inférieur." },
+                { id: "C", text: "leur avantage est qu'elles permettent de mesurer directement l'odds ratio", correct: false, explication: "Faux. Elles mesurent le Risque Relatif (RR). L'OR est pour les cas-témoins." },
+                { id: "D", text: "sont généralement moins fiables que les études cas témoin", correct: false, explication: "Faux. Plus fiables (moins de biais de mémoire)." },
+                { id: "E", text: "permettent d'étudier plusieurs maladies liées à une exposition donnée", correct: true, explication: "Vrai. On suit les exposés et on voit tout ce qui survient." }
+            ]
+        },
+        {
+            id: 20,
+            text: "Les études cas témoin :",
+            items: [
+                { id: "A", text: "Un niveau de preuve inférieur aux séries de cas", correct: false, explication: "Faux. Supérieur (comparatif)." },
+                { id: "B", text: "Permettent d'étudier plusieurs maladies et une exposition", correct: false, explication: "Faux. Une maladie (Cas) et plusieurs expositions passées." },
+                { id: "C", text: "Sont rétrospectives", correct: true, explication: "Vrai. On remonte dans le temps." },
+                { id: "D", text: "Sont souvent entachées de facteurs de confusion", correct: true, explication: "Vrai. Plus difficiles à contrôler que dans un essai randomisé." },
+                { id: "E", text: "Permettent directement de calculer le risque relatif", correct: false, explication: "Faux. On calcule l'Odds Ratio." }
+            ]
+        }
+    ]
+};
+
+// --- STATE MANAGEMENT ---
+let currentQIndex = 0;
+let userAnswers = {}; 
+let flaggedQuestions = new Set();
+let timerInterval;
+let secondsElapsed = 0;
+let isTimerPaused = false;
+
+// --- INITIALIZATION ---
+function init() {
+    renderNav();
+}
+
+function startQuiz() {
+    document.getElementById('home-screen').classList.add('hidden');
+    document.getElementById('quiz-interface').classList.remove('hidden');
+    loadQuestion(0);
+    startTimer();
+    renderNav();
+}
+
+// --- CORE FUNCTIONS ---
+function loadQuestion(index) {
+    currentQIndex = index;
+    const q = quizData.questions[index];
+    
+    document.getElementById('header-q-num').innerText = `Question ${index + 1}/${quizData.questions.length}`;
+    updateNavSelection();
+
+    const container = document.getElementById('question-container');
+    const existingAnswers = userAnswers[q.id] || [];
+    
+    let html = `
+        <div class="question-card">
+            <div class="q-header">
+                <span>UE2 BIOSTATISTIQUES</span>
+                <span>${q.id}</span>
+            </div>
+            <div class="q-text">${q.text}</div>
+            <div class="items-list">
+    `;
+
+    q.items.forEach(item => {
+        const isSelected = existingAnswers.includes(item.id);
+        html += `
+            <div class="item-row ${isSelected ? 'selected' : ''}" onclick="toggleItem('${item.id}', this)">
+                <div class="checkbox">${isSelected ? '✓' : ''}</div>
+                <div class="item-letter">${item.id}</div>
+                <div>${item.text}</div>
+            </div>
+        `;
+    });
+
+    html += `</div></div>`;
+    container.innerHTML = html;
+}
+
+function toggleItem(itemId, element) {
+    const qId = quizData.questions[currentQIndex].id;
+    if (!userAnswers[qId]) userAnswers[qId] = [];
+    
+    const idx = userAnswers[qId].indexOf(itemId);
+    if (idx === -1) {
+        userAnswers[qId].push(itemId);
+        element.classList.add('selected');
+        element.querySelector('.checkbox').innerText = '✓';
+    } else {
+        userAnswers[qId].splice(idx, 1);
+        element.classList.remove('selected');
+        element.querySelector('.checkbox').innerText = '';
+    }
+}
+
+function validateAnswer() {
+    const q = quizData.questions[currentQIndex];
+    const userAns = userAnswers[q.id] || [];
+    
+    let errors = 0;
+    q.items.forEach(item => {
+        const isChecked = userAns.includes(item.id);
+        if (isChecked && !item.correct) errors++; 
+        if (!isChecked && item.correct) errors++; 
+    });
+
+    let score = 0;
+    let scoreClass = 'danger';
+    let scoreText = '0 POINT';
+    
+    if (errors === 0) { score = 1; scoreClass = 'success'; scoreText = '✅ 1 POINT'; }
+    else if (errors === 1) { score = 0.5; scoreClass = 'warning'; scoreText = '⚠️ 0.5 POINT'; }
+    else { score = 0; scoreClass = 'danger'; scoreText = '❌ 0 POINT'; }
+
+    q.score = score;
+    q.errors = errors;
+
+    showFeedback(q, userAns, score, scoreText, scoreClass);
+}
+
+function showFeedback(q, userAns, score, scoreText, scoreClass) {
+    pauseTimer();
+    const overlay = document.getElementById('feedback-overlay');
+    const summary = document.getElementById('feedback-summary');
+    const details = document.getElementById('feedback-details');
+    const actionArea = document.getElementById('feedback-action-area');
+    
+    summary.innerHTML = `
+        <div class="score-badge" style="color: var(--${scoreClass})">${scoreText}</div>
+        <div style="font-size: 1.2rem; margin-bottom: 1rem; color: var(--text-main);">${q.errors} erreur(s) commise(s)</div>
+        <div style="color: var(--text-muted)">${score === 1 ? 'Bravo ! Réponse parfaite.' : (score === 0.5 ? 'Attention, presque bon !' : 'À revoir d\'urgence.')}</div>
+    `;
+
+    let detailsHtml = '';
+    q.items.forEach(item => {
+        const isChecked = userAns.includes(item.id);
+        let statusClass = '';
+        let icon = '';
+        let statusText = '';
+
+        if (item.correct) {
+            if (isChecked) { statusClass = 'correct'; icon = '✅'; statusText = 'Correct (Coché)'; }
+            else { statusClass = 'error'; icon = '⚠️'; statusText = 'Erreur (Oublié)'; }
+        } else {
+            if (isChecked) { statusClass = 'error'; icon = '❌'; statusText = 'Erreur (Coché à tort)'; }
+            else { statusClass = 'correct'; icon = '✓'; statusText = 'Correct (Non coché)'; }
+        }
+
+        detailsHtml += `
+            <div class="detail-card ${statusClass}">
+                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-weight:bold;">
+                    <span>${icon} Item ${item.id} - ${statusText}</span>
+                    <span style="color: ${item.correct ? 'var(--success)' : 'var(--danger)'}">${item.correct ? 'VRAI' : 'FAUX'}</span>
+                </div>
+                <div style="font-style: italic; margin-bottom: 0.5rem; color: var(--text-main);">"${item.text}"</div>
+                <div style="padding-top: 0.5rem; border-top: 1px dashed var(--border); color: var(--text-muted);">
+                    <strong>Explication :</strong> ${item.explication}
+                </div>
+            </div>
+        `;
+    });
+    details.innerHTML = detailsHtml;
+
+    const isLastQuestion = currentQIndex === quizData.questions.length - 1;
+    if (isLastQuestion) {
+        actionArea.innerHTML = `<button class="btn-primary" onclick="finishQuiz()" style="font-size: 1.2rem; padding: 1rem 3rem; background-color: var(--success);">TERMINER & VOIR RÉSULTATS 🏁</button>`;
+    } else {
+        actionArea.innerHTML = `<button class="btn-primary" onclick="nextQuestion()" style="font-size: 1.2rem; padding: 1rem 3rem;">Question Suivante →</button>`;
+    }
+
+    overlay.classList.add('active');
+    updateNavColor(currentQIndex, scoreClass);
+}
+
+function nextQuestion() {
+    document.getElementById('feedback-overlay').classList.remove('active');
+    resumeTimer();
+    if (currentQIndex < quizData.questions.length - 1) {
+        loadQuestion(currentQIndex + 1);
+    }
+}
+
+function finishQuiz() {
+    document.getElementById('feedback-overlay').classList.remove('active');
+    document.getElementById('quiz-interface').classList.add('hidden');
+    
+    const summaryScreen = document.getElementById('summary-screen');
+    summaryScreen.classList.remove('hidden');
+    summaryScreen.style.display = 'block'; 
+    
+    let totalScore = 0;
+    quizData.questions.forEach(q => { totalScore += (q.score || 0); });
+    
+    document.getElementById('final-score').innerText = `${totalScore} / 20`;
+    document.getElementById('final-percent').innerText = `${(totalScore/20*100).toFixed(1)}%`;
+    document.getElementById('final-time').innerText = formatTime(secondsElapsed);
+
+    const list = document.getElementById('summary-details');
+    let fullHtml = '';
+
+    quizData.questions.forEach((q, i) => {
+        const userAns = userAnswers[q.id] || [];
+        const scoreColor = q.score === 1 ? 'var(--success)' : (q.score === 0.5 ? 'var(--warning)' : 'var(--danger)');
+        const scoreBadge = q.score === 1 ? '✅ 1 Point' : (q.score === 0.5 ? '⚠️ 0.5 Point' : '❌ 0 Point');
+
+        let qBlock = `
+        <div class="summary-block">
+            <h3>
+                <span>Q${i+1}</span>
+                <span class="score-tag" style="background:${scoreColor}">${scoreBadge}</span>
+            </h3>
+            <p style="margin-bottom:1rem; color:var(--text-main); font-weight:600;">${q.text}</p>
+            <div>
+        `;
+
+        q.items.forEach(item => {
+            const isChecked = userAns.includes(item.id);
+            let icon = '';
+            let color = '';
+            
+            if (item.correct) {
+                if (isChecked) { icon = '✅'; color = 'var(--success)'; } 
+                else { icon = '⚠️'; color = 'var(--warning)'; } 
+            } else {
+                if (isChecked) { icon = '❌'; color = 'var(--danger)'; } 
+                else { icon = '✓'; color = 'var(--text-muted)'; } 
+            }
+
+            qBlock += `
+            <div class="summary-item-row">
+                <div class="summary-item-status">${icon}</div>
+                <div class="summary-item-text">
+                    <span style="color:${color}; font-weight:bold; margin-right:0.5rem;">${item.id}</span>
+                    <span style="color:var(--text-main);">${item.text}</span>
+                    ${isChecked ? '<span class="user-action ua-checked">COCHÉ</span>' : ''}
+                    <div class="summary-item-expl">${item.explication}</div>
+                </div>
+            </div>`;
+        });
+
+        qBlock += `</div></div>`;
+        fullHtml += qBlock;
+    });
+
+    list.innerHTML = fullHtml;
+}
+
+function copyCorrection() {
+    let text = `RAPPORT DE CORRECTION - ${quizData.title}\n`;
+    text += `Score: ${document.getElementById('final-score').innerText} (${document.getElementById('final-percent').innerText})\n`;
+    text += `Temps: ${document.getElementById('final-time').innerText}\n`;
+    text += `--------------------------------------------------\n\n`;
+
+    quizData.questions.forEach((q, i) => {
+        const userAns = userAnswers[q.id] || [];
+        text += `QUESTION ${i+1} : ${q.text}\n`;
+        text += `Note : ${q.score || 0}/1 pt\n`;
+        
+        q.items.forEach(item => {
+            const isChecked = userAns.includes(item.id);
+            let status = '';
+            
+            if (item.correct) {
+                status = isChecked ? "✅ VRAI (Coché)" : "⚠️ VRAI (Oublié)";
+            } else {
+                status = isChecked ? "❌ FAUX (Coché à tort)" : "✓ FAUX (Non coché)";
+            }
+
+            text += `   [${item.id}] ${status}\n`;
+            text += `   ↳ ${item.explication}\n`;
+        });
+        text += `\n--------------------------------------------------\n\n`;
+    });
+
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('button[onclick="copyCorrection()"]');
+        const originalText = btn.innerText;
+        btn.innerText = "✅ Copié !";
+        setTimeout(() => btn.innerText = originalText, 2000);
+    });
+}
+
+// --- UTILITIES ---
+function flagQuestion() {
+    const qId = quizData.questions[currentQIndex].id;
+    if (flaggedQuestions.has(qId)) flaggedQuestions.delete(qId);
+    else flaggedQuestions.add(qId);
+    renderNav();
+}
+
+function toggleNav() {
+    document.getElementById('nav-panel').classList.toggle('open');
+}
+
+function renderNav() {
+    const grid = document.getElementById('nav-grid');
+    grid.innerHTML = quizData.questions.map((q, i) => {
+        const isFlagged = flaggedQuestions.has(q.id);
+        return `<button class="nav-btn ${i === currentQIndex ? 'current' : ''}" onclick="loadQuestion(${i}); toggleNav();">
+            ${isFlagged ? '⭐' : ''} ${i+1}
+        </button>`;
+    }).join('');
+}
+
+function updateNavColor(index, status) {
+    const btn = document.getElementById('nav-grid').children[index];
+    btn.classList.remove('success', 'warning', 'danger');
+    btn.classList.add(status);
+}
+
+function updateNavSelection() {
+    const btns = document.querySelectorAll('.nav-btn');
+    btns.forEach((b, i) => {
+        if (i === currentQIndex) b.classList.add('current');
+        else b.classList.remove('current');
+    });
+}
+
+function startTimer() {
+    timerInterval = setInterval(() => {
+        if (!isTimerPaused) {
+            secondsElapsed++;
+            document.getElementById('timer').innerText = formatTime(secondsElapsed);
+        }
+    }, 1000);
+}
+
+function pauseTimer() {
+    isTimerPaused = true;
+    document.getElementById('timer').classList.add('paused');
+}
+
+function resumeTimer() {
+    isTimerPaused = false;
+    document.getElementById('timer').classList.remove('paused');
+}
+
+function formatTime(sec) {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+}
+
+function toggleTheme() {
+    if (document.body.getAttribute('data-theme') === 'light') {
+        document.body.removeAttribute('data-theme');
+        document.body.setAttribute('data-theme', 'dark');
+    } else {
+        document.body.setAttribute('data-theme', 'light');
+    }
+}
+
+document.addEventListener('keydown', (e) => {
+    if(document.getElementById('quiz-interface').classList.contains('hidden')) return;
+    if (e.key === 'f') flagQuestion();
+});
+
+init();
+</script>
+</body>
+</html>
